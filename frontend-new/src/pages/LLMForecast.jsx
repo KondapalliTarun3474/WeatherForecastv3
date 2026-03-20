@@ -27,9 +27,14 @@ const LLMForecast = () => {
             if (property === 'RH2M') port = 5002;
             if (property === 'WS2M') port = 5003;
 
+            const username = localStorage.getItem('username') || 'anonymous';
+
             const response = await fetch(`http://localhost:${port}/forecast`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Username': username
+                },
                 body: JSON.stringify({
                     lat: parseFloat(lat),
                     lon: parseFloat(lon),

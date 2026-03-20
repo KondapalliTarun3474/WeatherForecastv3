@@ -17,3 +17,4 @@
     - { role: inference, tags: ['inference'] }
     - { role: frontend, tags: ['frontend'] }
     - { role: retrainer, tags: ['retrainer'] }
+    - { role: db, tags: ['db'] }

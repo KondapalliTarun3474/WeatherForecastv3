@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
       - name: inference-t2m
-        image: kondapallitarun3474/weather-inference:v1
-        imagePullPolicy: Always
+        image: weather-inference:v1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5001
         resources:
@@ -27,6 +27,9 @@ spec:
           limits:
             cpu: "500m"
             memory: "1024Mi"
+        env:
+        - name: DB_SERVICE_URL
+          value: "http://db-service:5004"
         volumeMounts:
         - name: model-storage
           mountPath: /app/models
@@ -52,8 +55,8 @@ spec:
     spec:
       containers:
       - name: inference-rh2m
-        image: kondapallitarun3474/weather-inference:v1
-        imagePullPolicy: Always
+        image: weather-inference:v1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5001
         resources:
@@ -63,6 +66,9 @@ spec:
           limits:
             cpu: "500m"
             memory: "1024Mi"
+        env:
+        - name: DB_SERVICE_URL
+          value: "http://db-service:5004"
         volumeMounts:
         - name: model-storage
           mountPath: /app/models
@@ -88,8 +94,8 @@ spec:
     spec:
       containers:
       - name: inference-ws2m
-        image: kondapallitarun3474/weather-inference:v1
-        imagePullPolicy: Always
+        image: weather-inference:v1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5001
         resources:
@@ -99,6 +105,9 @@ spec:
           limits:
             cpu: "500m"
             memory: "1024Mi"
+        env:
+        - name: DB_SERVICE_URL
+          value: "http://db-service:5004"
         volumeMounts:
         - name: model-storage
           mountPath: /app/models

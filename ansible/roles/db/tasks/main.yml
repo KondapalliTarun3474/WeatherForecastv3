@@ -1,0 +1,28 @@
+---
+- name: Set DB Service image
+  kubernetes.core.k8s:
+    state: patched
+    kind: Deployment
+    name: db-service
+    namespace: "{{ namespace }}"
+    definition:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: db-service
+                image: "{{ docker_user }}/weather-db:{{ retrainer_tag | default('latest') }}"
+
+- name: Set MongoDB image
+  kubernetes.core.k8s:
+    state: patched
+    kind: Deployment
+    name: mongodb
+    namespace: "{{ namespace }}"
+    definition:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: mongodb
+                image: "mongo:7.0"

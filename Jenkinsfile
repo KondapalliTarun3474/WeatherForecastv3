@@ -4,6 +4,7 @@ def AUTH_CHANGED = false
 def INFERENCE_CHANGED = false
 def FRONTEND_CHANGED = false
 def MLOPS_CHANGED = false
+def DB_CHANGED = false
 def ansibleTagsString = ""
 
 pipeline {
@@ -12,7 +13,6 @@ pipeline {
     environment {
         // Credentials ID as configured in Jenkins
         DOCKER_CREDENTIALS_ID = 'docker-credentials'
-        // DOCKER_USER = 'kondapallitarun3474' // Removed: Provided by Vault Credentials
         
         // Dynamic Image Tag
         DOCKER_Tag = "v${env.BUILD_NUMBER}"
@@ -27,8 +27,6 @@ pipeline {
                 checkout scm
             }
         }
-
-
 
         stage('Detect Changes') {
             steps {
@@ -47,12 +45,12 @@ pipeline {
                         INFERENCE_CHANGED = true
                         FRONTEND_CHANGED = true
                         MLOPS_CHANGED = true
+                        DB_CHANGED = true
                     }
 
-                    // Helper to check changes via shell (robust against string formatting issues)
-                    // If git diff fails (e.g. first run), we default to 'true' (deploy match)
+                    // Helper to check changes via shell
                     def checkChange = { pattern ->
-                        if (gitDiff.isEmpty()) return true // Assume changed if git diff failed
+                        if (gitDiff.isEmpty()) return true 
                         return gitDiff.contains(pattern)
                     }
 
@@ -72,16 +70,14 @@ pipeline {
                         MLOPS_CHANGED = true
                         if (!tagsList.contains('retrainer')) tagsList.add('retrainer')
                     }
+                    if (checkChange('db-service/')) {
+                        DB_CHANGED = true
+                        if (!tagsList.contains('db')) tagsList.add('db')
+                    }
                     
                     ansibleTagsString = tagsList.join(',')
                     
-                    if (AUTH_CHANGED || INFERENCE_CHANGED || FRONTEND_CHANGED || MLOPS_CHANGED) {
-                        // This variable is no longer needed as we use the individual _CHANGED flags
-                        // but keeping it for the ansible stage's 'when' condition for now.
-                        // The ansible stage's 'when' condition should ideally check if ansibleTagsString is not empty.
-                    }
-                    
-                    echo "Deploy Decisions -> Auth: ${AUTH_CHANGED}, Inference: ${INFERENCE_CHANGED}, Frontend: ${FRONTEND_CHANGED}, MLOps: ${MLOPS_CHANGED}"
+                    echo "Deploy Decisions -> Auth: ${AUTH_CHANGED}, Inference: ${INFERENCE_CHANGED}, Frontend: ${FRONTEND_CHANGED}, MLOps: ${MLOPS_CHANGED}, DB: ${DB_CHANGED}"
                     echo "Ansible Tags: ${ansibleTagsString}"
                 }
             }
@@ -103,9 +99,19 @@ pipeline {
             steps {
                 echo "Running Unit Tests for Inference Service..."
                 script {
-                    // Inference requirements might be needed if they differ
                     sh "pip install -r mlops-llm4ts/model-service/inference-service/requirements_param.txt"
                     sh "python3 -m unittest mlops-llm4ts/model-service/inference-service/test_inference.py"
+                }
+            }
+        }
+
+        stage('Test DB') {
+            when { expression { return DB_CHANGED } }
+            steps {
+                echo "Running Unit Tests for DB Service..."
+                script {
+                    sh "pip install -r db-service/requirements.txt"
+                    sh "python3 -m unittest db-service/test_db.py"
                 }
             }
         }
@@ -115,7 +121,6 @@ pipeline {
             steps {
                 echo "Running Smoke Tests for Frontend..."
                 script {
-                    // Simple python validation since node might not be available or slow to install
                     sh "python3 frontend-new/test_frontend.py"
                 }
             }
@@ -166,6 +171,23 @@ pipeline {
             }
         }
 
+        stage('Build & Push DB') {
+            when { expression { return DB_CHANGED } }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: DOCKER_CREDENTIALS_ID,
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                        docker build -t \${DOCKER_USER}/weather-db:\${DOCKER_Tag} -f db-service/Dockerfile.db db-service/
+                        docker push \${DOCKER_USER}/weather-db:\${DOCKER_Tag}
+                    """
+                }
+            }
+        }
+
         stage('Build & Push Frontend') {
             when { expression { return FRONTEND_CHANGED } }
             steps {
@@ -183,10 +205,8 @@ pipeline {
             }
         }
         
-        stage('Build and Push MLOps Retrainer') {
-            when {
-                expression { return MLOPS_CHANGED }
-            }
+        stage('Build & Push MLOps Retrainer') {
+            when { expression { return MLOPS_CHANGED } }
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: DOCKER_CREDENTIALS_ID,
@@ -203,11 +223,9 @@ pipeline {
         }
         
         stage('Deploy with Ansible') {
-            when { expression { return ansibleTagsString != '' } } // Deploy only if there are changes to deploy
+            when { expression { return ansibleTagsString != '' } } 
             steps {
-                // Execute Ansible Playbook from the root
-                // We pass dynamic tags so Ansible deploys the version we just built
-                sh "ansible-playbook ansible/deploy.yml --tags '${ansibleTagsString}' -e 'auth_tag=${DOCKER_Tag} inference_tag=${DOCKER_Tag} frontend_tag=${DOCKER_Tag} retrainer_tag=${DOCKER_Tag}'"
+                sh "ansible-playbook ansible/deploy.yml --tags '${ansibleTagsString}' -e 'auth_tag=${DOCKER_Tag} inference_tag=${DOCKER_Tag} frontend_tag=${DOCKER_Tag} retrainer_tag=${DOCKER_Tag} db_tag=${DOCKER_Tag}'"
             }
         }
     }

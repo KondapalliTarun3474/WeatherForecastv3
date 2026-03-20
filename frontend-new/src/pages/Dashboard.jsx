@@ -69,6 +69,7 @@ const Dashboard = () => {
     const [usersList, setUsersList] = useState([]);
     const [adminRequests, setAdminRequests] = useState([]); // New state for notifications
     const [graphMetric, setGraphMetric] = useState('t2m');
+    const [history, setHistory] = useState([]);
 
     useEffect(() => {
         // Check Auth
@@ -132,6 +133,27 @@ const Dashboard = () => {
             setLocation({ lat: 51.5074, lon: -0.1278 });
         }
     }, [navigate]);
+
+    // Fetch History if approved
+    useEffect(() => {
+        const username = localStorage.getItem('username');
+        if (requestStatus === 'approved' && username) {
+            // Note: In local dev this might fail if not proxied correctly, 
+            // but in K8s it goes through /api/db/
+            fetch(`http://localhost:5000/access/status?username=${username}`) // Dummy to ensure we have latest status
+
+            // Real history fetch - using auth port 5000 as proxy or direct db-service if local
+            // Better to use the relative path /api/db/ for production-ready frontend
+            const historyUrl = window.location.hostname === 'localhost'
+                ? `http://localhost:5001/history?username=${username}` // Proxy via inference service
+                : `/api/db/inference-log/${username}`;
+
+            fetch(historyUrl)
+                .then(res => res.json())
+                .then(data => setHistory(data.history || []))
+                .catch(err => console.error("History fetch failed", err));
+        }
+    }, [requestStatus]);
 
     const handleToggleAccess = async (user, currentAccess) => {
         try {
@@ -539,6 +561,50 @@ const Dashboard = () => {
                     color={graphMetric === 't2m' ? '#60a5fa' : '#34d399'}
                 />
             </div>
+
+            {/* Recent Predictions History (User Specific) */}
+            {requestStatus === 'approved' && (
+                <div className="rounded-2xl bg-white/5 p-6 border border-white/10 backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-indigo-400" />
+                        Recent Predictions
+                    </h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-slate-400">
+                            <thead className="text-slate-500 uppercase text-xs font-semibold border-b border-white/5">
+                                <tr>
+                                    <th className="px-4 py-3">Model</th>
+                                    <th className="px-4 py-3">Coordinates</th>
+                                    <th className="px-4 py-3">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {history.length > 0 ? history.map((log, i) => (
+                                    <tr key={i} className="hover:bg-white/5 transition-colors">
+                                        <td className="px-4 py-4">
+                                            <span className="px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded text-xs font-mono">
+                                                {log.model_name}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-4 text-slate-300 font-mono">
+                                            {log.lat?.toFixed(2)}, {log.lon?.toFixed(2)}
+                                        </td>
+                                        <td className="px-4 py-4 text-xs text-slate-500">
+                                            {new Date(log.timestamp).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="3" className="px-4 py-8 text-center text-slate-600 italic">
+                                            No recent predictions found.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
             {/* Floating Logout Button */}
             <button
                 onClick={() => {

@@ -15,6 +15,12 @@ docker build -f mlops-llm4ts/model-service/inference-service/Dockerfile.param -t
 echo "Building Frontend Image..."
 docker build -t weather-frontend:v1 frontend-new/
 
+echo "Building DB Service Image..."
+docker build -f db-service/Dockerfile.db -t weather-db:v1 db-service/
+
+echo "Building Retrainer Image..."
+docker build -f MLOps-automation-service/Dockerfile.retrainer -t weather-retrainer:v1 MLOps-automation-service/
+
 echo "Applying Kubernetes Manifests..."
 kubectl apply -f k8s/
 

@@ -16,7 +16,7 @@ spec:
       containers:
       - name: frontend
         image: weather-frontend:v1
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
         resources:

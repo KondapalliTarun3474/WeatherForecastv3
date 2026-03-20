@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
       - name: auth-service
-        image: kondapallitarun3474/weather-auth:v1
-        imagePullPolicy: Always
+        image: weather-auth:v1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
         resources:
@@ -26,22 +26,6 @@ spec:
           limits:
             cpu: "500m"
             memory: "256Mi"
-        volumeMounts:
-        - name: app-data
-          mountPath: /app/users.json
-          subPath: users.json
-      initContainers:
-      - name: init-users
-        image: busybox
-        command: ["sh", "-c", "cat /config/users.json > /data/users.json"]
-        volumeMounts:
-        - name: users-config
-          mountPath: /config
-        - name: app-data
-          mountPath: /data
-      volumes:
-      - name: users-config
-        configMap:
-          name: auth-users-config
-      - name: app-data
-        emptyDir: {}
+        env:
+        - name: DB_SERVICE_URL
+          value: "http://db-service:5004"
