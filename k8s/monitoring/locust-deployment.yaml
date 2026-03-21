@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-deployment
+  namespace: weather-mlops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust
+  template:
+    metadata:
+      labels:
+        app: locust
+    spec:
+      containers:
+      - name: locust
+        image: weather-locust:v1
+        ports:
+        - containerPort: 8089
+        env:
+        - name: LOCUST_LOCUSTFILE
+          value: "/home/locust/locustfile.py"
+        - name: LOCUST_HOST
+          value: "http://auth-service:5000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-service
+  namespace: weather-mlops
+spec:
+  selector:
+    app: locust
+  type: NodePort
+  ports:
+  - port: 8089
+    targetPort: 8089
+    nodePort: 30889

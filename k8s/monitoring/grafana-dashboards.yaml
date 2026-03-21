@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: weather-mlops
+data:
+  auth-performance.json: |-
+    {
+      "id": null,
+      "title": "Auth Service Performance",
+      "tags": ["auth", "performance"],
+      "timezone": "browser",
+      "panels": [
+        {
+          "title": "Throughput (Request Rate)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            { "expr": "sum(rate(auth_requests_total[1m])) by (method, endpoint, http_status)", "legendFormat": "{{method}} {{endpoint}} ({{http_status}})" }
+          ]
+        },
+        {
+          "title": "Latency (P99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, sum by (le) (rate(auth_request_latency_seconds_bucket[1m])))", "legendFormat": "P99 Latency" }
+          ]
+        },
+        {
+          "title": "Error Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            { "expr": "sum(rate(auth_errors_total[1m])) by (endpoint, error_type)", "legendFormat": "{{endpoint}} Error {{error_type}}" }
+          ]
+        }
+      ],
+      "schemaVersion": 36,
+      "version": 0
+    }

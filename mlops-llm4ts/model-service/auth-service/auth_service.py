@@ -16,6 +16,8 @@ from datetime import datetime
 from utils.logging import configure_logging
 import db_client
 from db_client import DBServiceUnavailable
+import time
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # ────────────────────────────────────────────────────────────
 # Configuration
@@ -29,6 +31,51 @@ CORS(app)
 configure_logging(app)
 
 DB_ENABLED = bool(os.getenv("DB_SERVICE_URL", ""))
+
+# ────────────────────────────────────────────────────────────
+# Prometheus Metrics
+# ────────────────────────────────────────────────────────────
+AUTH_REQUESTS = Counter(
+    'auth_requests_total', 
+    'Total requests to Auth Service', 
+    ['method', 'endpoint', 'http_status']
+)
+AUTH_ERRORS = Counter(
+    'auth_errors_total', 
+    'Total errors in Auth Service', 
+    ['endpoint', 'error_type']
+)
+AUTH_LATENCY = Histogram(
+    'auth_request_latency_seconds', 
+    'Request latency for Auth Service', 
+    ['endpoint'],
+    buckets=(0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf"))
+)
+
+@app.before_request
+def start_timer():
+    request.start_time = time.time()
+
+@app.after_request
+def record_metrics(response):
+    if request.path != '/metrics' and request.path != '/health':
+        latency = time.time() - getattr(request, 'start_time', time.time())
+        AUTH_LATENCY.labels(endpoint=request.path).observe(latency)
+        AUTH_REQUESTS.labels(
+            method=request.method, 
+            endpoint=request.path, 
+            http_status=response.status_code
+        ).inc()
+        if response.status_code >= 400:
+            AUTH_ERRORS.labels(
+                endpoint=request.path, 
+                error_type=str(response.status_code)
+            ).inc()
+    return response
+
+@app.route("/metrics")
+def metrics():
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 
 # ────────────────────────────────────────────────────────────
